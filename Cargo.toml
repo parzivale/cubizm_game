@@ -1,0 +1,25 @@
+[package]
+name = "cubizm_game"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+resolver = "2"
+
+exclude = [
+    "crates/block-mesh-rs/examples-crate"
+]
+
+members = [
+    "crates/cubizm",
+    "crates/block-mesh-rs",
+]
+
+
+
+
+[dependencies]
+cubizm = { path = "crates/cubizm" }
+block-mesh = { path = "crates/block-mesh-rs" }
+bevy = "0.13.1"
+bevy_flycam = "0.13.0"
