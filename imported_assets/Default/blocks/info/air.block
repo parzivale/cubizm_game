@@ -1,6 +1,0 @@
-(
-    mesh: None,
-    name: "Air",
-    texture: None,
-    visibility: Empty
-)
