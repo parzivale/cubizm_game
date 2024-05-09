@@ -37,10 +37,10 @@ pub struct BlockAtlas {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct SerializedBlock {
-    mesh: Option<String>,
-    name: String,
-    texture: Option<String>,
-    visibility: VoxelVisibility,
+    pub mesh: Option<String>,
+    pub name: String,
+    pub texture: Option<String>,
+    pub visibility: VoxelVisibility,
 }
 
 #[derive(Clone, Debug, Asset, TypePath)]

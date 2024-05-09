@@ -3,14 +3,15 @@ use std::ops::Add;
 
 use bevy::asset::{Handle, LoadedFolder};
 use bevy::prelude::*;
+use bevy::render::texture::FallbackImage;
 use bevy::utils::HashMap;
 use thiserror::Error;
 
 use block_mesh::ndshape::ConstShape;
 
-use crate::{AppState, Block, BlockAtlas, ChunkShape};
 use crate::chunk::{Chunk, ChunkFace};
 use crate::util::Opposite;
+use crate::{AppState, Block, BlockAtlas, ChunkShape};
 
 /// The chunk representation of the world
 #[derive(Resource, Default)]
@@ -391,7 +392,8 @@ fn begin_loading_chunks(mut next_state: ResMut<NextState<ChunkLoadingState>>) {
 pub struct ChunksPlugin;
 impl Plugin for ChunksPlugin {
     fn build(&self, app: &mut App) {
-        app.init_asset::<Chunk>()
+        app.init_state::<ChunkLoadingState>()
+            .init_asset::<Chunk>()
             .init_asset_loader::<crate::chunk::ChunkLoader>()
             .add_systems(OnEnter(AppState::BlocksLoaded), begin_loading_chunks)
             .add_systems(OnEnter(ChunkLoadingState::LoadChunks), load_chunks)

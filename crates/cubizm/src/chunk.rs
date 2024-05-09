@@ -1,10 +1,11 @@
+use std::iter;
+
 use bevy::asset::{AssetLoader, AsyncReadExt, BoxedFuture, LoadContext, ron};
 use bevy::asset::io::Reader;
 use bevy::prelude::*;
 use bevy::render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
 use serde::{Deserialize, Serialize};
-use serde_big_array::BigArray;
 use thiserror::Error;
 
 use block_mesh::{RIGHT_HANDED_Y_UP_CONFIG, UnitQuadBuffer, visible_block_faces};
@@ -26,17 +27,27 @@ pub enum ChunkFace {
 }
 
 #[derive(Serialize, Deserialize)]
-struct SerializedChunk {
-    #[serde(with = "BigArray")]
-    pub blocks: [String; ChunkShape::SIZE as usize],
+pub struct SerializedChunk {
+    pub blocks: Vec<String>,
     pub position: IVec3,
+}
+
+impl Default for SerializedChunk {
+    fn default() -> Self {
+        Self {
+            blocks: iter::repeat("blocks/info/air.block".to_string())
+                .take(ChunkShape::SIZE as usize)
+                .collect(),
+            position: IVec3::new(0, 0, 0),
+        }
+    }
 }
 
 /// Internal representation of a chunk. This does not contain the final [Mesh],
 /// see [ChunkEntity] instead if a mesh is needed
 #[derive(Asset, TypePath, Clone, Debug)]
 pub struct Chunk {
-    pub blocks: [Block; ChunkShape::SIZE as usize],
+    pub blocks: Vec<Block>,
     pub position: IVec3,
 }
 
@@ -175,6 +186,7 @@ impl Chunk {
         let mut positions = Vec::with_capacity(num_vertices);
         let mut normals = Vec::with_capacity(num_vertices);
         let mut tex_coords = Vec::with_capacity(num_vertices);
+
         for (group, face) in buffer.groups.into_iter().zip(faces.into_iter()) {
             for quad in group.into_iter() {
                 indices.extend_from_slice(&face.quad_mesh_indices(positions.len() as u32));
@@ -183,7 +195,7 @@ impl Chunk {
                     .voxel
                     .texture
                     .clone()
-                    .expect("The voxel has no associated texture");
+                    .expect("Voxel is marked as opaque but no texture was found");
                 positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
 
                 let index = texture_atlas
@@ -274,12 +286,9 @@ impl AssetLoader for ChunkLoader {
             let mut bytes = Vec::new();
             reader.read_to_end(&mut bytes).await?;
             let ron: SerializedChunk = ron::de::from_bytes(&bytes)?;
-            let mut blocks = <[Block; ChunkShape::SIZE as usize]>::try_from(vec![
-                Block::default();
-                ChunkShape::SIZE
-                    as usize
-            ])
-            .unwrap();
+            let mut blocks: Vec<Block> = iter::repeat(Block::air())
+                .take(ChunkShape::SIZE as usize)
+                .collect();
 
             for (index, block) in ron.blocks.iter().enumerate() {
                 let loaded = load_context.load_direct(block).await?;
