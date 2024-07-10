@@ -1,0 +1,15 @@
+[package]
+name = "cubizm_chunks"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { version = "0.13.1", features = ["jpeg", "asset_processor"] }
+cubizm_block = { path = "../cubizm_block"}
+cubizm_core = { path = "../cubizm_core"}
+block-mesh = { path = "../block-mesh-rs" }
+serde = { version = "1.0.197", features = ["derive"] }
+serde-big-array = "0.5.1"
+thiserror = "1.0.60"

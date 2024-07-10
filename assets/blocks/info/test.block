@@ -1,1 +1,1 @@
-(mesh:None,name:"Test",texture:Some("blocks/textures/test.png"),visibility:Opaque)
+SerializedVoxel((name:"Test",texture:Some("blocks/textures/test.png"),visibility:Opaque))

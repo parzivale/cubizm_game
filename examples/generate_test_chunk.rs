@@ -1,7 +1,8 @@
 use bevy::asset::ron;
+use bevy::math::IVec3;
 
 use block_mesh::ndshape::ConstShape;
-use cubizm::{CHUNK_SIZE, ChunkShape, SerializedChunk};
+use cubizm_chunks::{ChunkShape, SerializedChunk, CHUNK_SIZE};
 
 fn main() {
     let mut chunk = SerializedChunk::default();
@@ -13,6 +14,7 @@ fn main() {
             }
         }
     }
+    chunk.position = IVec3::new(1, 0, 0);
     std::fs::write(
         "./assets/world/chunks/test.chunk",
         ron::ser::to_string(&chunk).unwrap(),

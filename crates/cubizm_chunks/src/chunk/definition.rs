@@ -1,17 +1,17 @@
-use std::iter;
-
-use bevy::asset::{AssetLoader, AsyncReadExt, BoxedFuture, LoadContext, ron};
-use bevy::asset::io::Reader;
-use bevy::prelude::*;
-use bevy::render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues};
-use bevy::render::render_asset::RenderAssetUsages;
+use bevy::{
+    prelude::*,
+    render::{
+        mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+        render_asset::RenderAssetUsages,
+    },
+};
+use block_mesh::{
+    ndshape::{ConstShape, ConstShape3u32},
+    visible_block_faces, UnitQuadBuffer, RIGHT_HANDED_Y_UP_CONFIG,
+};
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-use block_mesh::{RIGHT_HANDED_Y_UP_CONFIG, UnitQuadBuffer, visible_block_faces};
-use block_mesh::ndshape::{ConstShape, ConstShape3u32};
-
-use crate::block::Block;
+use cubizm_block::definition::Block;
 
 pub const CHUNK_SIZE: u32 = 16;
 pub type ChunkShape = ConstShape3u32<{ CHUNK_SIZE + 2 }, { CHUNK_SIZE + 2 }, { CHUNK_SIZE + 2 }>;
@@ -26,29 +26,46 @@ pub enum ChunkFace {
     Right,
 }
 
+pub trait Opposite {
+    fn opposite(&self) -> Self;
+}
+
+impl Opposite for ChunkFace {
+    fn opposite(&self) -> Self {
+        match &self {
+            ChunkFace::Back => ChunkFace::Front,
+            ChunkFace::Bottom => ChunkFace::Top,
+            ChunkFace::Left => ChunkFace::Right,
+            ChunkFace::Front => ChunkFace::Back,
+            ChunkFace::Top => ChunkFace::Bottom,
+            ChunkFace::Right => ChunkFace::Left,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct SerializedChunk {
     pub blocks: Vec<String>,
     pub position: IVec3,
 }
 
+/// Internal representation of a chunk. This does not contain the final [Mesh],
+/// see [ChunkEntity] instead if a mesh is needed
+#[derive(Asset, TypePath, Clone, Debug)]
+pub struct Chunk {
+    pub blocks: Vec<Handle<Block>>,
+    pub position: IVec3,
+}
+
 impl Default for SerializedChunk {
     fn default() -> Self {
         Self {
-            blocks: iter::repeat("blocks/info/air.block".to_string())
+            blocks: std::iter::repeat("blocks/info/air.block".to_string())
                 .take(ChunkShape::SIZE as usize)
                 .collect(),
             position: IVec3::new(0, 0, 0),
         }
     }
-}
-
-/// Internal representation of a chunk. This does not contain the final [Mesh],
-/// see [ChunkEntity] instead if a mesh is needed
-#[derive(Asset, TypePath, Clone, Debug)]
-pub struct Chunk {
-    pub blocks: Vec<Block>,
-    pub position: IVec3,
 }
 
 impl Chunk {
@@ -168,12 +185,25 @@ impl Chunk {
         indicies
     }
 
-    pub fn gen_geometry(&self, texture_atlas: &TextureAtlasLayout) -> Mesh {
+    pub fn gen_geometry(
+        &self,
+        texture_atlas: &TextureAtlasLayout,
+        blocks_server: Res<Assets<Block>>,
+    ) -> Mesh {
         let faces = RIGHT_HANDED_Y_UP_CONFIG.faces;
 
         let mut buffer = UnitQuadBuffer::new();
+        let blocks = self
+            .blocks
+            .iter()
+            .map(|handle| {
+                blocks_server
+                    .get(handle)
+                    .expect("Got an Id for an Asset that does not exist")
+            })
+            .collect::<Vec<_>>();
         visible_block_faces(
-            &self.blocks,
+            &blocks,
             &ChunkShape {},
             [0; 3],
             [CHUNK_SIZE + 1; 3],
@@ -189,12 +219,14 @@ impl Chunk {
 
         for (group, face) in buffer.groups.into_iter().zip(faces.into_iter()) {
             for quad in group.into_iter() {
+                if !&quad.voxel.is_voxel() {
+                    continue;
+                };
                 indices.extend_from_slice(&face.quad_mesh_indices(positions.len() as u32));
                 normals.extend_from_slice(&face.quad_mesh_normals());
                 let texture = &quad
                     .voxel
-                    .texture
-                    .clone()
+                    .voxel_texture()
                     .expect("Voxel is marked as opaque but no texture was found");
                 positions.extend_from_slice(&face.quad_mesh_positions(&quad.into(), 1.0));
 
@@ -255,53 +287,5 @@ impl Chunk {
             VertexAttributeValues::Float32x2(tex_coords),
         )
         .with_inserted_indices(Indices::U32(indices.clone()))
-    }
-}
-
-#[derive(Debug, Error)]
-pub enum ChunkLoaderError {
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
-    #[error(transparent)]
-    RonSpannedError(#[from] ron::error::SpannedError),
-    #[error(transparent)]
-    LoadDirectError(#[from] bevy::asset::LoadDirectError),
-}
-
-#[derive(Default)]
-pub struct ChunkLoader;
-
-impl AssetLoader for ChunkLoader {
-    type Asset = Chunk;
-    type Settings = ();
-    type Error = ChunkLoaderError;
-
-    fn load<'a>(
-        &'a self,
-        reader: &'a mut Reader<'_>,
-        _settings: &'a Self::Settings,
-        load_context: &'a mut LoadContext<'_>,
-    ) -> BoxedFuture<'a, Result<Self::Asset, Self::Error>> {
-        Box::pin(async move {
-            let mut bytes = Vec::new();
-            reader.read_to_end(&mut bytes).await?;
-            let ron: SerializedChunk = ron::de::from_bytes(&bytes)?;
-            let mut blocks: Vec<Block> = iter::repeat(Block::air())
-                .take(ChunkShape::SIZE as usize)
-                .collect();
-
-            for (index, block) in ron.blocks.iter().enumerate() {
-                let loaded = load_context.load_direct(block).await?;
-                blocks[index] = loaded.get::<Block>().unwrap().clone();
-            }
-            Ok(Chunk {
-                blocks,
-                position: ron.position,
-            })
-        })
-    }
-
-    fn extensions(&self) -> &[&str] {
-        &["chunk"]
     }
 }

@@ -3,25 +3,6 @@ use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::render::texture::{ImageAddressMode, ImageSampler, ImageSamplerDescriptor};
 
-use crate::chunk::ChunkFace;
-
-pub trait Opposite {
-    fn opposite(&self) -> Self;
-}
-
-impl Opposite for ChunkFace {
-    fn opposite(&self) -> Self {
-        match &self {
-            ChunkFace::Back => ChunkFace::Front,
-            ChunkFace::Bottom => ChunkFace::Top,
-            ChunkFace::Left => ChunkFace::Right,
-            ChunkFace::Front => ChunkFace::Back,
-            ChunkFace::Top => ChunkFace::Bottom,
-            ChunkFace::Right => ChunkFace::Left,
-        }
-    }
-}
-
 pub fn uv_debug_texture() -> bevy::prelude::Image {
     const TEXTURE_SIZE: usize = 8;
 

@@ -1,6 +1,1 @@
-(
-    mesh: None,
-    name: "Air",
-    texture: None,
-    visibility: Empty
-)
+SerializedVoxel((name:"Air",texture:None,visibility:Empty))

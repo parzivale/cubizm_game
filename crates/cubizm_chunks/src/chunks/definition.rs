@@ -1,22 +1,16 @@
-use std::fmt::Debug;
-use std::ops::Add;
-
-use bevy::asset::{Handle, LoadedFolder};
-use bevy::prelude::*;
-use bevy::render::texture::FallbackImage;
-use bevy::utils::HashMap;
-use thiserror::Error;
-
+use crate::ChunkShape;
+use crate::Opposite;
+use crate::{Chunk, ChunkFace};
+use bevy::{prelude::*, utils::HashMap};
 use block_mesh::ndshape::ConstShape;
-
-use crate::chunk::{Chunk, ChunkFace};
-use crate::util::Opposite;
-use crate::{AppState, Block, BlockAtlas, ChunkShape};
+use cubizm_block::{definition::Block, texture_atlas::BlockAtlas};
+use std::ops::Add;
+use thiserror::Error;
 
 /// The chunk representation of the world
 #[derive(Resource, Default)]
 pub struct Chunks {
-    chunks: HashMap<IVec3, ChunkEntity>,
+    pub chunks: HashMap<IVec3, ChunkEntity>,
 }
 
 /// Stores the [Chunk] data and its [Mesh], use the [Chunks] resource to access.
@@ -58,6 +52,11 @@ pub enum ChunkError {
 }
 
 impl Chunks {
+    #[allow(unused)]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Grabs the neighbouring chunk by a given [direction](ChunkFace)
     fn get_neighbouring_chunk_mut(
         &mut self,
@@ -89,6 +88,7 @@ impl Chunks {
     /// Inserts a [Chunk] at a given [position](IVec3), does NOT update neighbours
     /// use [insert_chunk_and_regenerate](Chunks::insert_chunk_and_regenerate) to update neighbours on insertion or
     /// manually call [regenerate_chunk_at](Chunks::regenerate_chunk_at) to update neighbours
+    #[allow(clippy::too_many_arguments)]
     pub fn insert_chunk(
         &mut self,
         chunk: Chunk,
@@ -98,8 +98,9 @@ impl Chunks {
         meshes: &mut ResMut<Assets<Mesh>>,
         materials: &mut ResMut<Assets<StandardMaterial>>,
         chunks: &mut ResMut<Assets<Chunk>>,
+        blocks: Res<Assets<Block>>,
     ) {
-        let mesh = chunk.gen_geometry(&(texture_atlas.texture_atlas_layout));
+        let mesh = chunk.gen_geometry(texture_atlas.get_texture_atlas_layout(), blocks);
         let chunk_handle = chunks.add(chunk);
         let mesh_handle = meshes.add(mesh);
 
@@ -112,7 +113,7 @@ impl Chunks {
                 ),
                 mesh: mesh_handle.clone(),
                 material: materials.add(StandardMaterial {
-                    base_color_texture: Some(texture_atlas.image.clone()),
+                    base_color_texture: Some(texture_atlas.clone_image()),
                     ..default()
                 }),
                 ..default()
@@ -134,6 +135,7 @@ impl Chunks {
         meshes: &mut ResMut<Assets<Mesh>>,
         texture_atlas_layout: &TextureAtlasLayout,
         chunks: &mut ResMut<Assets<Chunk>>,
+        blocks: Res<Assets<Block>>,
     ) -> Result<(), ChunkError> {
         let own_entity = self
             .chunks
@@ -150,6 +152,7 @@ impl Chunks {
             texture_atlas_layout: &TextureAtlasLayout,
             chunk_face: ChunkFace,
             mesh_handle: Handle<Mesh>,
+            blocks: Res<Assets<Block>>,
         ) {
             let chunk_own_indicies = Chunk::get_own_face_indicies(chunk_face);
             let chunk_other_indicies = Chunk::get_other_face_indicies(chunk_face);
@@ -166,7 +169,8 @@ impl Chunks {
                     other_chunk.blocks[*front_own as usize].clone();
                 other_chunk.blocks[front_other as usize] =
                     chunk.blocks[*chunk_own as usize].clone();
-                let other_chunk_geometry = other_chunk.gen_geometry(texture_atlas_layout);
+                let other_chunk_geometry =
+                    other_chunk.gen_geometry(texture_atlas_layout, Res::clone(&blocks));
                 meshes.insert(mesh_handle.clone(), other_chunk_geometry);
             }
         }
@@ -181,6 +185,7 @@ impl Chunks {
                 texture_atlas_layout,
                 ChunkFace::Front,
                 mesh_handle,
+                Res::clone(&blocks),
             );
         }
         if let Some(back) = self.get_neighbouring_chunk_mut(position, ChunkFace::Back) {
@@ -193,6 +198,7 @@ impl Chunks {
                 texture_atlas_layout,
                 ChunkFace::Back,
                 mesh_handle,
+                Res::clone(&blocks),
             );
         }
         if let Some(top) = self.get_neighbouring_chunk_mut(position, ChunkFace::Top) {
@@ -205,6 +211,7 @@ impl Chunks {
                 texture_atlas_layout,
                 ChunkFace::Top,
                 mesh_handle,
+                Res::clone(&blocks),
             );
         }
         if let Some(bottom) = self.get_neighbouring_chunk_mut(position, ChunkFace::Bottom) {
@@ -217,6 +224,7 @@ impl Chunks {
                 texture_atlas_layout,
                 ChunkFace::Bottom,
                 mesh_handle,
+                Res::clone(&blocks),
             );
         }
         if let Some(right) = self.get_neighbouring_chunk_mut(position, ChunkFace::Right) {
@@ -229,6 +237,7 @@ impl Chunks {
                 texture_atlas_layout,
                 ChunkFace::Right,
                 mesh_handle,
+                Res::clone(&blocks),
             );
         }
         if let Some(left) = self.get_neighbouring_chunk_mut(position, ChunkFace::Left) {
@@ -241,10 +250,14 @@ impl Chunks {
                 texture_atlas_layout,
                 ChunkFace::Left,
                 mesh_handle,
+                Res::clone(&blocks),
             );
         }
 
-        meshes.insert(handle.clone(), own.gen_geometry(texture_atlas_layout));
+        meshes.insert(
+            handle.clone(),
+            own.gen_geometry(texture_atlas_layout, Res::clone(&blocks)),
+        );
 
         let own_entity = self
             .chunks
@@ -260,6 +273,7 @@ impl Chunks {
     /// Essentially it will regenerate meshes for all adjacent chunks
     /// This is needed as block face is only meshed if it exposed to air, and upon insertion a chunk
     /// assumes it is surrounded by air and will be updated by its neighbours
+    #[allow(clippy::too_many_arguments)]
     pub fn insert_chunk_and_regenerate(
         &mut self,
         chunk: Chunk,
@@ -269,6 +283,7 @@ impl Chunks {
         materials: &mut ResMut<Assets<StandardMaterial>>,
         texture_atlas: Res<BlockAtlas>,
         chunks: &mut ResMut<Assets<Chunk>>,
+        blocks: Res<Assets<Block>>,
     ) {
         self.insert_chunk(
             chunk,
@@ -278,13 +293,15 @@ impl Chunks {
             meshes,
             materials,
             chunks,
+            Res::clone(&blocks),
         );
 
         self.regenerate_chunk_at(
             position,
             meshes,
-            &texture_atlas.texture_atlas_layout,
+            texture_atlas.get_texture_atlas_layout(),
             chunks,
+            blocks,
         )
         .unwrap();
     }
@@ -310,100 +327,8 @@ impl Chunks {
             relative_coords.z as u32,
         ]);
         let chunk = chunks.get_mut(chunk.chunk.clone()).unwrap();
-        chunk.blocks[index as usize] = blocks.get(block).unwrap().clone();
-        self.regenerate_chunk_at(chunk_coords, meshes, texture_atlas_layout, chunks)?;
+        chunk.blocks[index as usize] = block;
+        self.regenerate_chunk_at(chunk_coords, meshes, texture_atlas_layout, chunks, blocks)?;
         Ok(())
-    }
-
-    #[allow(unused)]
-    fn new() -> Self {
-        Self::default()
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, States)]
-enum ChunkLoadingState {
-    #[default]
-    Pending,
-    LoadChunks,
-    Finished,
-}
-
-#[derive(Resource, Default)]
-pub struct ChunksFolder(Handle<LoadedFolder>);
-
-fn load_chunks(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.insert_resource(ChunksFolder(asset_server.load_folder("world/chunks")));
-}
-
-fn check_chunk(
-    mut next_state: ResMut<NextState<ChunkLoadingState>>,
-    block_info_folder: Res<ChunksFolder>,
-    mut events: EventReader<AssetEvent<LoadedFolder>>,
-) {
-    for event in events.read() {
-        if event.is_loaded_with_dependencies(&block_info_folder.0) {
-            next_state.set(ChunkLoadingState::Finished);
-        }
-    }
-}
-
-fn create_chunk_resource(
-    mut commands: Commands,
-    loaded_folders: Res<Assets<LoadedFolder>>,
-    chunk_handles: Res<ChunksFolder>,
-    mut assets_chunks: ResMut<Assets<Chunk>>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    texture_atlas: Res<BlockAtlas>,
-) {
-    let mut chunks = Chunks::new();
-    let loaded_folder = loaded_folders.get(&chunk_handles.0).unwrap();
-    for handle in loaded_folder.handles.iter() {
-        let chunk_id = handle.id().typed_unchecked::<Chunk>();
-        let Some(chunk) = assets_chunks.get(chunk_id) else {
-            warn!(
-                "{:?} did not resolve to an `Chunk` asset.",
-                handle.path().unwrap()
-            );
-            continue;
-        };
-
-        chunks.insert_chunk_and_regenerate(
-            chunk.to_owned(),
-            chunk.position,
-            &mut commands,
-            &mut meshes,
-            &mut materials,
-            Res::clone(&texture_atlas),
-            &mut assets_chunks,
-        );
-    }
-}
-
-fn move_to_loaded_chunks(mut next_state: ResMut<NextState<AppState>>) {
-    next_state.set(AppState::ChunksLoaded);
-}
-
-fn begin_loading_chunks(mut next_state: ResMut<NextState<ChunkLoadingState>>) {
-    next_state.set(ChunkLoadingState::LoadChunks);
-}
-
-pub struct ChunksPlugin;
-impl Plugin for ChunksPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_state::<ChunkLoadingState>()
-            .init_asset::<Chunk>()
-            .init_asset_loader::<crate::chunk::ChunkLoader>()
-            .add_systems(OnEnter(AppState::BlocksLoaded), begin_loading_chunks)
-            .add_systems(OnEnter(ChunkLoadingState::LoadChunks), load_chunks)
-            .add_systems(
-                Update,
-                check_chunk.run_if(in_state(ChunkLoadingState::LoadChunks)),
-            )
-            .add_systems(
-                OnEnter(ChunkLoadingState::Finished),
-                (create_chunk_resource, move_to_loaded_chunks),
-            );
     }
 }

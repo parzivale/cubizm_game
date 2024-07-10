@@ -1,35 +1,26 @@
-use std::f32::consts::PI;
-
 use bevy::pbr::wireframe::{WireframeConfig, WireframePlugin};
 use bevy::prelude::*;
-use bevy::render::RenderPlugin;
 use bevy::render::settings::{RenderCreation, WgpuFeatures, WgpuSettings};
-use bevy_flycam::PlayerPlugin;
+use bevy::render::RenderPlugin;
 
-use cubizm::{BlockPlugin, ChunksPlugin, Cubizm};
+use bevy_flycam::PlayerPlugin;
+use cubizm_game::CubizmGameDefault;
 
 fn main() {
     let mut app = App::new();
 
     app.add_plugins((
-        DefaultPlugins
-            .set(RenderPlugin {
-                render_creation: RenderCreation::Automatic(WgpuSettings {
-                    // WARN this is a native only feature. It will not work with webgl or webgpu
-                    features: WgpuFeatures::POLYGON_MODE_LINE,
-                    ..default()
-                }),
-                ..default()
-            })
-            .set(AssetPlugin {
-                mode: AssetMode::Processed,
+        DefaultPlugins.set(RenderPlugin {
+            render_creation: RenderCreation::Automatic(WgpuSettings {
+                // WARN this is a native only feature. It will not work with webgl or webgpu
+                features: WgpuFeatures::POLYGON_MODE_LINE,
                 ..default()
             }),
+            ..default()
+        }),
         // You need to add this plugin to enable wireframe rendering
         WireframePlugin,
-        BlockPlugin,
-        ChunksPlugin,
-        Cubizm,
+        CubizmGameDefault,
         PlayerPlugin,
     ))
     .insert_resource(WireframeConfig {
@@ -41,22 +32,5 @@ fn main() {
         // Can be changed per mesh using the `WireframeColor` component.
         default_color: Color::WHITE,
     });
-    app.add_systems(Startup, setup);
     app.run();
-}
-
-fn setup(mut commands: Commands) {
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
-            illuminance: light_consts::lux::OVERCAST_DAY,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform {
-            translation: Vec3::new(0.0, 2.0, 0.0),
-            rotation: Quat::from_rotation_x(-PI / 4.),
-            ..default()
-        },
-        ..default()
-    });
 }

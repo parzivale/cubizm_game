@@ -11,15 +11,17 @@ exclude = [
 ]
 
 members = [
-    "crates/cubizm",
+    "crates/cubizm_core",
     "crates/block-mesh-rs",
+    "crates/cubizm_block",
+    "crates/cubizm_chunks"
 ]
 
 
-
-
 [dependencies]
-cubizm = { path = "crates/cubizm" }
+cubizm_core = { path = "crates/cubizm_core" }
+cubizm_chunks = { path = "crates/cubizm_chunks" }
+cubizm_block = { path = "crates/cubizm_block" }
 block-mesh = { path = "crates/block-mesh-rs" }
 bevy = "0.13.1"
 bevy_flycam = "0.13.0"

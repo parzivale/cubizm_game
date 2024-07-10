@@ -1,5 +1,5 @@
 [package]
-name = "cubizm"
+name = "cubizm_block"
 version = "0.1.0"
 edition = "2021"
 
@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 bevy = { version = "0.13.1", features = ["jpeg", "asset_processor"] }
+cubizm_core = {path = "../cubizm_core"}
 block-mesh = { path = "../block-mesh-rs" }
 serde = { version = "1.0.197", features = ["derive"] }
 serde-big-array = "0.5.1"
